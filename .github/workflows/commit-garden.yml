@@ -1,0 +1,84 @@
+name: Grow commit garden
+
+on:
+  schedule:
+    # Daily at 03:17 UTC. GitHub Actions schedules may be delayed during load.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      min_commits:
+        description: Minimum number of commits for this run
+        required: false
+        default: "1"
+        type: number
+      max_commits:
+        description: Maximum number of commits for this run
+        required: false
+        default: "3"
+        type: number
+
+permissions:
+  contents: write
+
+concurrency:
+  group: commit-garden-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  grow:
+    runs-on: ubuntu-latest
+    env:
+      MIN_COMMITS: ${{ inputs.min_commits || vars.MIN_COMMITS || '1' }}
+      MAX_COMMITS: ${{ inputs.max_commits || vars.MAX_COMMITS || '3' }}
+      COMMIT_NAME: ${{ vars.COMMIT_NAME || 'Commit Garden Bot' }}
+      COMMIT_EMAIL: ${{ secrets.COMMIT_EMAIL || format('{0}@users.noreply.github.com', github.actor) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select a random commit count
+        id: count
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          min="$MIN_COMMITS"
+          max="$MAX_COMMITS"
+
+          if ! [[ "$min" =~ ^[0-9]+$ && "$max" =~ ^[0-9]+$ ]]; then
+            echo "MIN_COMMITS and MAX_COMMITS must be non-negative integers." >&2
+            exit 1
+          fi
+          if (( min > max )); then
+            echo "MIN_COMMITS cannot be greater than MAX_COMMITS." >&2
+            exit 1
+          fi
+
+          count=$((min + RANDOM % (max - min + 1)))
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "This run will create $count commit(s)."
+
+      - name: Grow the garden
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "$COMMIT_NAME"
+          git config user.email "$COMMIT_EMAIL"
+
+          for ((i = 1; i <= ${{ steps.count.outputs.count }}; i++)); do
+            timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            marker="$(openssl rand -hex 4)"
+            printf '%s | run=%s | marker=%s\n' "$timestamp" "$i" "$marker" >> activity/growth.log
+            git add activity/growth.log
+            git commit -m "chore: grow the garden ($timestamp)"
+          done
+
+          if (( ${{ steps.count.outputs.count }} > 0 )); then
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "No commits requested; nothing to push."
+          fi

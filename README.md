@@ -13,7 +13,7 @@ A tiny GitHub Actions repository that periodically grows a visible activity log 
 
 1. Create an empty GitHub repository and push this directory to it.
 2. In the repository settings, enable **Actions** if needed.
-3. Optional: add a repository secret named `COMMIT_EMAIL` containing an email address associated with your GitHub account. GitHub only attributes commits to your profile when the commit email is associated with that account.
+3. Recommended: add a repository secret named `COMMIT_EMAIL` containing an email address associated with your GitHub account. GitHub only attributes commits to your profile when the commit email is associated with that account. If omitted, the workflow uses the actor's GitHub noreply address.
 4. Optional: add repository variables named `MIN_COMMITS`, `MAX_COMMITS`, and `COMMIT_NAME` to customize the defaults.
 
 The default range is 1–3 commits per scheduled run. Manual runs can override the range through workflow inputs.
